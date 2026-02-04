@@ -1,85 +1,86 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Simple Clicker</title>
+    <title>Multiplayer Clicker</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 </head>
-<body class="bg-black text-white flex items-center justify-center min-h-screen font-sans">
+<body class="bg-zinc-900 text-white flex items-center justify-center min-h-screen">
 
-    <!-- SCREEN 1: WHO ARE YOU? -->
-    <div id="login-screen" class="text-center">
-        <h1 class="text-4xl font-bold mb-10">Select Your Player</h1>
+    <!-- Screen 1: Pick Name -->
+    <div id="login" class="text-center">
+        <h1 class="text-3xl font-bold mb-8 italic">Who are you?</h1>
         <div class="flex gap-4">
-            <button onclick="pick('Derrick')" class="bg-blue-600 hover:bg-blue-500 px-10 py-6 rounded-2xl text-2xl font-bold transition-transform active:scale-90">
-                Derrick
-            </button>
-            <button onclick="pick('Grace')" class="bg-pink-600 hover:bg-pink-500 px-10 py-6 rounded-2xl text-2xl font-bold transition-transform active:scale-90">
-                Grace
-            </button>
+            <button onclick="start('Derrick')" class="bg-blue-600 p-6 rounded-xl text-xl font-bold hover:bg-blue-500">Derrick</button>
+            <button onclick="start('Grace')" class="bg-rose-600 p-6 rounded-xl text-xl font-bold hover:bg-rose-500">Grace</button>
         </div>
     </div>
 
-    <!-- SCREEN 2: THE GAME -->
-    <div id="game-screen" class="hidden text-center">
-        <div class="mb-10 uppercase tracking-widest text-gray-500 font-bold" id="player-tag"></div>
-        
-        <h1 id="count" class="text-9xl font-black mb-10 text-yellow-400">0</h1>
-        
-        <button onclick="clickIt()" class="w-64 h-64 bg-white text-black rounded-full text-4xl font-black shadow-[0_0_50px_rgba(255,255,255,0.3)] active:scale-95 transition-all">
-            CLICK
-        </button>
-        
-        <div class="mt-16 border-t border-white/10 pt-8">
-            <p class="text-xs text-gray-500 uppercase font-bold">Last Clicker</p>
-            <p id="who" class="text-3xl font-bold text-gray-300">...</p>
-        </div>
+    <!-- Screen 2: Game -->
+    <div id="game" class="hidden text-center">
+        <div id="error-box" class="text-red-500 mb-4 font-bold"></div>
+        <h1 id="score" class="text-9xl font-black mb-8 text-white">0</h1>
+        <button onclick="hit()" class="bg-white text-black w-48 h-48 rounded-full text-4xl font-black active:scale-90 transition-transform">CLICK</button>
+        <p class="mt-10 text-gray-500 uppercase text-xs font-bold tracking-widest">Last Clicker</p>
+        <p id="last-person" class="text-2xl font-bold">Connecting...</p>
     </div>
 
     <script>
-        // CONFIG
-        const SB_URL = 'https://dhtqvsdojuoxzfewtxld.supabase.co';
-        const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRodHF2c2RvanVveHpmZXd0eGxkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjgxNTkxMzQsImV4cCI6MjA4MzczNTEzNH0.MAcxrDMZQ20kQXv-nk3zvNGMQlP9-BR97UYT5p_W7Fg';
-        const supabase = window.supabase.createClient(SB_URL, SB_KEY);
+        // --- PUT YOUR OWN STUFF HERE ---
+        const URL = 'https://dhtqvsdojuoxzfewtxld.supabase.coL';
+        const KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRodHF2c2RvanVveHpmZXd0eGxkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjgxNTkxMzQsImV4cCI6MjA4MzczNTEzNH0.MAcxrDMZQ20kQXv-nk3zvNGMQlP9-BR97UYT5p_W7Fg';
+        // -------------------------------
 
+        const supabase = window.supabase.createClient(URL, KEY);
         let myName = "";
+        let currentCount = 0;
 
-        // ACTION: PICK NAME
-        function pick(name) {
+        async function start(name) {
             myName = name;
+            // Hide login, show game
+            document.getElementById('login').classList.add('hidden');
+            document.getElementById('game').classList.remove('hidden');
             
-            // Immediately switch UI
-            document.getElementById('login-screen').classList.add('hidden');
-            document.getElementById('game-screen').classList.remove('hidden');
-            document.getElementById('player-tag').innerText = "Playing as " + myName;
-
-            // Start background sync
-            init();
+            await loadData();
+            subscribe();
         }
 
-        async function init() {
-            // Load initial score
-            const { data } = await supabase.from('clicker_data').select('*').single();
-            if(data) refresh(data);
-
-            // Listen for others clicking
-            supabase.channel('clicks')
-            .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'clicker_data' }, p => refresh(p.new))
-            .subscribe();
+        async function loadData() {
+            const { data, error } = await supabase.from('clicker').select('*').eq('id', 1).single();
+            if (error) {
+                document.getElementById('error-box').innerText = "DB Error: Table not found or RLS is ON";
+                console.error(error);
+            } else {
+                updateUI(data);
+            }
         }
 
-        async function clickIt() {
-            // Visual fake increment for instant feel
-            const countEl = document.getElementById('count');
-            countEl.innerText = parseInt(countEl.innerText) + 1;
-
-            // Send to DB
-            await supabase.rpc('increment_simple', { p_name: myName });
+        function subscribe() {
+            supabase.channel('room1')
+                .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'clicker' }, payload => {
+                    updateUI(payload.new);
+                })
+                .subscribe();
         }
 
-        function refresh(data) {
-            document.getElementById('count').innerText = data.total_clicks;
-            document.getElementById('who').innerText = data.last_person;
+        async function hit() {
+            // Predict for speed
+            currentCount++;
+            document.getElementById('score').innerText = currentCount;
+            document.getElementById('last-person').innerText = myName;
+
+            // Save to DB
+            const { error } = await supabase.from('clicker')
+                .update({ count: currentCount, who: myName })
+                .eq('id', 1);
+            
+            if (error) console.error("Update failed", error);
+        }
+
+        function updateUI(data) {
+            currentCount = data.count;
+            document.getElementById('score').innerText = data.count;
+            document.getElementById('last-person').innerText = data.who;
         }
     </script>
 </body>
