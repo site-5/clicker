@@ -1,171 +1,76 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Multiplayer Cookie Clicker</title>
+    <title>Simple Clicker</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
-    <style>
-        @keyframes bounce-click { 0%, 100% { transform: scale(1); } 50% { transform: scale(0.95); } }
-        .cookie-btn:active { animation: bounce-click 0.1s ease-in-out; }
-    </style>
 </head>
-<body class="bg-amber-50 min-h-screen font-sans text-amber-900">
+<body class="bg-slate-900 text-white flex items-center justify-center min-h-screen">
 
-    <!-- Login Screen -->
-    <div id="login-screen" class="fixed inset-0 flex items-center justify-center bg-amber-100 z-50">
-        <div class="bg-white p-8 rounded-xl shadow-2xl text-center max-w-sm w-full">
-            <h1 class="text-3xl font-bold mb-6 italic">Cookie Clicker MP</h1>
-            <input type="text" id="username" placeholder="Enter your name" 
-                   class="w-full p-3 border-2 border-amber-200 rounded-lg mb-4 focus:outline-none focus:border-amber-500">
-            <button onclick="startGame()" 
-                    class="w-full bg-amber-600 text-white font-bold py-3 rounded-lg hover:bg-amber-700 transition">
-                Start Baking
-            </button>
-        </div>
+    <!-- Screen 1: Name Entry -->
+    <div id="login" class="text-center p-10 bg-slate-800 rounded-3xl shadow-2xl">
+        <h1 class="text-3xl font-bold mb-6 text-blue-400">Who are you?</h1>
+        <input id="name-input" type="text" class="bg-slate-700 p-3 rounded-lg block w-full mb-4 outline-none focus:ring-2 ring-blue-500">
+        <button onclick="enter()" class="bg-blue-600 w-full py-3 rounded-lg font-bold hover:bg-blue-500">Go</button>
     </div>
 
-    <!-- Game Screen -->
-    <div id="game-screen" class="hidden flex flex-col md:flex-row h-screen">
-        <!-- Left: The Cookie -->
-        <div class="flex-1 flex flex-col items-center justify-center p-8 border-b md:border-b-0 md:border-r border-amber-200">
-            <div class="text-center mb-8">
-                <h2 id="cookie-display" class="text-6xl font-black mb-2">0 Cookies</h2>
-                <p id="cps-display" class="text-xl opacity-75">per second: 0</p>
-            </div>
-            
-            <button onclick="clickCookie()" class="cookie-btn focus:outline-none relative group">
-                <img src="https://pngimg.com/uploads/cookie/cookie_PNG13656.png" class="w-80 h-80 select-none pointer-events-none drop-shadow-2xl group-hover:scale-105 transition-transform" alt="Big Cookie">
-            </button>
-            
-            <div class="mt-12 text-center bg-white/50 px-6 py-4 rounded-full shadow-inner">
-                <p class="text-xs font-bold uppercase tracking-widest opacity-40 mb-1">Last Action By</p>
-                <p id="last-clicker" class="text-xl font-bold text-amber-700">Connecting...</p>
-            </div>
-        </div>
-
-        <!-- Right: Shop -->
-        <div class="w-full md:w-96 bg-white/40 backdrop-blur-md overflow-y-auto p-6 shadow-xl">
-            <h3 class="text-2xl font-black mb-6 flex justify-between items-center">
-                Store 
-                <span id="my-name" class="text-xs font-medium bg-amber-200 px-3 py-1 rounded-full text-amber-800"></span>
-            </h3>
-            <div id="upgrades-list" class="space-y-4">
-                <!-- Upgrades injected here -->
-            </div>
+    <!-- Screen 2: The Button -->
+    <div id="game" class="hidden text-center">
+        <h1 id="count" class="text-8xl font-black mb-2 text-blue-400">0</h1>
+        <p class="text-slate-400 mb-10">Total Global Clicks</p>
+        
+        <button onclick="doClick()" class="bg-blue-600 w-48 h-48 rounded-full text-4xl font-bold shadow-lg shadow-blue-900/50 active:scale-95 transition-transform">CLICK</button>
+        
+        <div class="mt-12 bg-slate-800 p-6 rounded-2xl">
+            <p class="text-xs font-bold uppercase tracking-tighter text-slate-500">Last Click Performed By</p>
+            <p id="last-person" class="text-2xl font-bold text-white">Connecting...</p>
         </div>
     </div>
 
     <script>
-        const SUPABASE_URL = 'https://dhtqvsdojuoxzfewtxld.supabase.co';
-        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRodHF2c2RvanVveHpmZXd0eGxkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjgxNTkxMzQsImV4cCI6MjA4MzczNTEzNH0.MAcxrDMZQ20kQXv-nk3zvNGMQlP9-BR97UYT5p_W7Fg';
-        
-        // Correct initialization
-        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        const SB_URL = 'https://dhtqvsdojuoxzfewtxld.supabase.co';
+        const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRodHF2c2RvanVveHpmZXd0eGxkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjgxNTkxMzQsImV4cCI6MjA4MzczNTEzNH0.MAcxrDMZQ20kQXv-nk3zvNGMQlP9-BR97UYT5p_W7Fg';
+        const supabase = window.supabase.createClient(SB_URL, SB_KEY);
 
-        let username = "";
-        let cookies = 0;
-        let upgrades = [];
-        let totalCPS = 0;
+        let myName = "";
+        let currentClicks = 0;
 
-        async function startGame() {
-            const nameInput = document.getElementById('username').value.trim();
-            if (!nameInput) return alert("Enter a name!");
-            username = nameInput;
+        function enter() {
+            myName = document.getElementById('name-input').value.trim();
+            if(!myName) return;
+            document.getElementById('login').style.display = 'none';
+            document.getElementById('game').style.display = 'block';
+            init();
+        }
+
+        async function init() {
+            // 1. Get initial data
+            const { data } = await supabase.from('clicker_data').select('*').single();
+            updateUI(data);
+
+            // 2. Listen for other people's clicks
+            supabase.channel('room1')
+            .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'clicker_data' }, payload => {
+                updateUI(payload.new);
+            }).subscribe();
+        }
+
+        async function doClick() {
+            // Update locally first for speed
+            currentClicks++;
+            document.getElementById('count').innerText = currentClicks;
             
-            document.getElementById('login-screen').classList.add('hidden');
-            document.getElementById('game-screen').classList.remove('hidden');
-            document.getElementById('my-name').innerText = username;
-
-            await fetchData();
-            setupRealtime();
-            
-            // local ticker for smoothness
-            setInterval(() => {
-                if (totalCPS > 0) {
-                    cookies += (totalCPS / 10);
-                    updateVisuals();
-                }
-            }, 100);
+            // Push to Supabase
+            await supabase.from('clicker_data')
+                .update({ total_clicks: currentClicks, last_person: myName })
+                .eq('id', 1);
         }
 
-        async function fetchData() {
-            const { data: state } = await supabase.from('game_state').select('*').single();
-            if (state) {
-                cookies = parseFloat(state.cookies);
-                document.getElementById('last-clicker').innerText = state.last_click_by;
-            }
-
-            const { data: storeItems } = await supabase.from('upgrades').select('*').order('cost', { ascending: true });
-            upgrades = storeItems || [];
-            calculateCPS();
-            renderUpgrades();
-            updateVisuals();
-        }
-
-        function setupRealtime() {
-            supabase.channel('public:game_state')
-                .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'game_state' }, payload => {
-                    cookies = parseFloat(payload.new.cookies);
-                    document.getElementById('last-clicker').innerText = payload.new.last_click_by;
-                    updateVisuals();
-                })
-                .on('postgres_changes', { event: '*', schema: 'public', table: 'upgrades' }, payload => {
-                    fetchData(); // Refresh all upgrades when one changes
-                })
-                .subscribe();
-        }
-
-        async function clickCookie() {
-            // Using RPC to ensure clicks are counted correctly in multiplayer
-            const { error } = await supabase.rpc('increment_cookies', { 
-                amount: 1, 
-                user_name: username 
-            });
-            if (error) console.error(error);
-        }
-
-        async function buyUpgrade(id) {
-            const item = upgrades.find(u => u.id === id);
-            if (cookies < item.cost) return;
-
-            // 1. Atomically deduct cookies & Update Upgrade
-            // In a production app, this should be one RPC transaction
-            const { error: e1 } = await supabase.from('game_state').update({ cookies: cookies - item.cost, last_click_by: `Bought ${item.name}` }).eq('id', 1);
-            const { error: e2 } = await supabase.from('upgrades').update({ 
-                quantity: item.quantity + 1,
-                cost: Math.floor(item.cost * 1.15),
-                last_bought_by: username
-            }).eq('id', id);
-        }
-
-        function calculateCPS() {
-            totalCPS = upgrades.reduce((acc, u) => acc + (u.quantity * u.cps_bonus), 0);
-            document.getElementById('cps-display').innerText = `per second: ${totalCPS}`;
-        }
-
-        function updateVisuals() {
-            document.getElementById('cookie-display').innerText = `${Math.floor(cookies).toLocaleString()} Cookies`;
-            upgrades.forEach(u => {
-                const btn = document.getElementById(`btn-${u.id}`);
-                if (btn) btn.disabled = cookies < u.cost;
-            });
-        }
-
-        function renderUpgrades() {
-            const container = document.getElementById('upgrades-list');
-            container.innerHTML = upgrades.map(u => `
-                <button id="btn-${u.id}" onclick="buyUpgrade(${u.id})" 
-                        class="w-full bg-white p-4 rounded-xl shadow-sm border-2 border-amber-100 flex justify-between items-center transition disabled:opacity-50 disabled:grayscale hover:border-amber-400">
-                    <div class="text-left">
-                        <div class="font-bold text-lg">${u.name} <span class="text-amber-500">x${u.quantity}</span></div>
-                        <div class="text-sm font-black text-amber-700">Cost: ${u.cost.toLocaleString()}</div>
-                        <div class="text-[10px] uppercase font-bold opacity-40">Last: ${u.last_bought_by}</div>
-                    </div>
-                    <div class="text-xl font-black text-amber-200">+${u.cps_bonus}</div>
-                </button>
-            `).join('');
+        function updateUI(data) {
+            if(!data) return;
+            currentClicks = data.total_clicks;
+            document.getElementById('count').innerText = currentClicks;
+            document.getElementById('last-person').innerText = data.last_person;
         }
     </script>
 </body>
