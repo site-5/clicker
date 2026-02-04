@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Multiplayer Cookie Clicker</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    <style>
+        @keyframes bounce-click { 0%, 100% { transform: scale(1); } 50% { transform: scale(0.95); } }
+        .cookie-btn:active { animation: bounce-click 0.1s ease-in-out; }
+        .bg-cookie { background-color: #f3e5ab; }
+    </style>
+</head>
+<body class="bg-amber-50 min-h-screen font-sans text-amber-900">
+
+    <!-- Login Screen -->
+    <div id="login-screen" class="fixed inset-0 flex items-center justify-center bg-amber-100 z-50">
+        <div class="bg-white p-8 rounded-xl shadow-2xl text-center max-w-sm w-full">
+            <h1 class="text-3xl font-bold mb-6">Cookie Clicker MP</h1>
+            <input type="text" id="username" placeholder="Enter your name" 
+                   class="w-full p-3 border-2 border-amber-200 rounded-lg mb-4 focus:outline-none focus:border-amber-500">
+            <button onclick="startGame()" 
+                    class="w-full bg-amber-600 text-white font-bold py-3 rounded-lg hover:bg-amber-700 transition">
+                Start Baking
+            </button>
+        </div>
+    </div>
+
+    <!-- Game Screen -->
+    <div id="game-screen" class="hidden flex flex-col md:flex-row h-screen">
+        <!-- Left: The Cookie -->
+        <div class="flex-1 flex flex-col items-center justify-center p-8 border-b md:border-b-0 md:border-r border-amber-200">
+            <div class="text-center mb-8">
+                <h2 id="cookie-display" class="text-5xl font-black mb-2">0 Cookies</h2>
+                <p id="cps-display" class="text-xl opacity-75">per second: 0</p>
+            </div>
+            
+            <button onclick="clickCookie()" class="cookie-btn focus:outline-none relative">
+                <img src="https://pngimg.com/uploads/cookie/cookie_PNG13656.png" class="w-64 h-64 select-none pointer-events-none" alt="Big Cookie">
+            </button>
+            
+            <div class="mt-8 text-center bg-white/50 p-4 rounded-lg">
+                <p class="text-sm font-semibold uppercase tracking-widest opacity-50">Last Clicked By</p>
+                <p id="last-clicker" class="text-lg font-bold">---</p>
+            </div>
+        </div>
+
+        <!-- Right: Shop -->
+        <div class="w-full md:w-96 bg-white/30 backdrop-blur-sm overflow-y-auto p-6">
+            <h3 class="text-2xl font-bold mb-6 flex justify-between">
+                Store 
+                <span id="my-name" class="text-sm font-normal text-amber-600 self-center"></span>
+            </h3>
+            <div id="upgrades-list" class="space-y-4">
+                <!-- Upgrades injected here -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- CONFIGURATION ---
+        const SUPABASE_URL = 'https://dhtqvsdojuoxzfewtxld.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRodHF2c2RvanVveHpmZXd0eGxkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjgxNTkxMzQsImV4cCI6MjA4MzczNTEzNH0.MAcxrDMZQ20kQXv-nk3zvNGMQlP9-BR97UYT5p_W7Fg';
+        const supabase = lib.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        let username = "";
+        let cookies = 0;
+        let upgrades = [];
+        let totalCPS = 0;
+
+        // --- CORE LOGIC ---
+        async function startGame() {
+            const nameInput = document.getElementById('username').value.trim();
+            if (!nameInput) return alert("Enter a name!");
+            username = nameInput;
+            
+            document.getElementById('login-screen').classList.add('hidden');
+            document.getElementById('game-screen').classList.remove('hidden');
+            document.getElementById('my-name').innerText = `as ${username}`;
+
+            await fetchData();
+            setupRealtime();
+            
+            // Local CPS loop (Visual only until DB update)
+            setInterval(() => {
+                if (totalCPS > 0) {
+                    cookies += (totalCPS / 10);
+                    updateVisuals();
+                }
+            }, 100);
+        }
+
+        async function fetchData() {
+            // Get Cookies
+            const { data: state } = await supabase.from('game_state').select('*').single();
+            if (state) {
+                cookies = state.cookies;
+                document.getElementById('last-clicker').innerText = state.last_click_by;
+            }
+
+            // Get Upgrades
+            const { data: storeItems } = await supabase.from('upgrades').select('*').order('cost', { ascending: true });
+            upgrades = storeItems || [];
+            calculateCPS();
+            renderUpgrades();
+            updateVisuals();
+        }
+
+        function setupRealtime() {
+            supabase.channel('game_events')
+                .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'game_state' }, payload => {
+                    cookies = payload.new.cookies;
+                    document.getElementById('last-clicker').innerText = payload.new.last_click_by;
+                    updateVisuals();
+                })
+                .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'upgrades' }, payload => {
+                    const idx = upgrades.findIndex(u => u.id === payload.new.id);
+                    if (idx !== -1) upgrades[idx] = payload.new;
+                    calculateCPS();
+                    renderUpgrades();
+                })
+                .subscribe();
+        }
+
+        async function clickCookie() {
+            const { data, error } = await supabase.rpc('increment_cookies', { 
+                amount: 1, 
+                user_name: username 
+            });
+            
+            // Alternative if RPC not setup: direct update (race condition prone but easier for setup)
+            await supabase.from('game_state').update({ 
+                cookies: cookies + 1, 
+                last_click_by: username 
+            }).eq('id', 1);
+        }
+
+        async function buyUpgrade(id) {
+            const item = upgrades.find(u => u.id === id);
+            if (cookies < item.cost) return;
+
+            const newCost = Math.floor(item.cost * 1.15);
+            
+            // 1. Deduct Cookies
+            await supabase.from('game_state').update({ cookies: cookies - item.cost }).eq('id', 1);
+            
+            // 2. Update Upgrade
+            await supabase.from('upgrades').update({ 
+                quantity: item.quantity + 1,
+                cost: newCost,
+                last_bought_by: username
+            }).eq('id', id);
+        }
+
+        // --- UI HELPERS ---
+        function calculateCPS() {
+            totalCPS = upgrades.reduce((acc, u) => acc + (u.quantity * u.cps_bonus), 0);
+            document.getElementById('cps-display').innerText = `per second: ${totalCPS}`;
+        }
+
+        function updateVisuals() {
+            document.getElementById('cookie-display').innerText = `${Math.floor(cookies).toLocaleString()} Cookies`;
+            // Enable/Disable buttons based on cost
+            upgrades.forEach(u => {
+                const btn = document.getElementById(`btn-${u.id}`);
+                if (btn) btn.disabled = cookies < u.cost;
+            });
+        }
+
+        function renderUpgrades() {
+            const container = document.getElementById('upgrades-list');
+            container.innerHTML = upgrades.map(u => `
+                <button id="btn-${u.id}" onclick="buyUpgrade(${u.id})" 
+                        class="w-full bg-white p-4 rounded-lg shadow-sm border-2 border-amber-100 flex justify-between items-center transition disabled:opacity-50 disabled:grayscale hover:border-amber-400">
+                    <div class="text-left">
+                        <div class="font-bold text-lg">${u.name} (${u.quantity})</div>
+                        <div class="text-sm text-amber-600 font-bold">Cost: ${u.cost}</div>
+                        <div class="text-xs opacity-60">Last: ${u.last_bought_by}</div>
+                    </div>
+                    <div class="text-2xl font-black text-amber-200">+${u.cps_bonus}</div>
+                </button>
+            `).join('');
+        }
+    </script>
+</body>
+</html>
