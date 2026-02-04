@@ -10,7 +10,7 @@
     <!-- Screen 1: Name Entry -->
     <div id="login" class="text-center p-10 bg-slate-800 rounded-3xl shadow-2xl">
         <h1 class="text-3xl font-bold mb-6 text-blue-400">Who are you?</h1>
-        <input id="name-input" type="text" class="bg-slate-700 p-3 rounded-lg block w-full mb-4 outline-none focus:ring-2 ring-blue-500">
+        <input id="name-input" type="text" placeholder="Your Name" class="bg-slate-700 p-3 rounded-lg block w-full mb-4 outline-none focus:ring-2 ring-blue-500 text-white">
         <button onclick="enter()" class="bg-blue-600 w-full py-3 rounded-lg font-bold hover:bg-blue-500">Go</button>
     </div>
 
@@ -19,10 +19,10 @@
         <h1 id="count" class="text-8xl font-black mb-2 text-blue-400">0</h1>
         <p class="text-slate-400 mb-10">Total Global Clicks</p>
         
-        <button onclick="doClick()" class="bg-blue-600 w-48 h-48 rounded-full text-4xl font-bold shadow-lg shadow-blue-900/50 active:scale-95 transition-transform">CLICK</button>
+        <button onclick="doClick()" class="bg-blue-600 w-48 h-48 rounded-full text-4xl font-bold shadow-lg shadow-blue-900/50 active:scale-95 transition-transform hover:bg-blue-500">CLICK</button>
         
         <div class="mt-12 bg-slate-800 p-6 rounded-2xl">
-            <p class="text-xs font-bold uppercase tracking-tighter text-slate-500">Last Click Performed By</p>
+            <p class="text-xs font-bold uppercase tracking-tighter text-slate-500">Last Action By</p>
             <p id="last-person" class="text-2xl font-bold text-white">Connecting...</p>
         </div>
     </div>
@@ -33,43 +33,54 @@
         const supabase = window.supabase.createClient(SB_URL, SB_KEY);
 
         let myName = "";
-        let currentClicks = 0;
 
-        function enter() {
-            myName = document.getElementById('name-input').value.trim();
-            if(!myName) return;
-            document.getElementById('login').style.display = 'none';
-            document.getElementById('game').style.display = 'block';
-            init();
+        async function enter() {
+            const input = document.getElementById('name-input');
+            myName = input.value.trim();
+            
+            if(!myName) {
+                alert("Please enter a name first!");
+                return;
+            }
+
+            // Switch screens first so the user sees something
+            document.getElementById('login').classList.add('hidden');
+            document.getElementById('game').classList.remove('hidden');
+            
+            try {
+                await init();
+            } catch (err) {
+                console.error("Failed to connect to Supabase:", err);
+                document.getElementById('last-person').innerText = "Connection Error";
+            }
         }
 
         async function init() {
             // 1. Get initial data
-            const { data } = await supabase.from('clicker_data').select('*').single();
+            const { data, error } = await supabase.from('clicker_data').select('*').single();
+            if (error) throw error;
             updateUI(data);
 
-            // 2. Listen for other people's clicks
-            supabase.channel('room1')
+            // 2. Listen for Realtime updates
+            supabase.channel('public:clicker_data')
             .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'clicker_data' }, payload => {
                 updateUI(payload.new);
             }).subscribe();
         }
 
         async function doClick() {
-            // Update locally first for speed
-            currentClicks++;
-            document.getElementById('count').innerText = currentClicks;
-            
-            // Push to Supabase
-            await supabase.from('clicker_data')
-                .update({ total_clicks: currentClicks, last_person: myName })
-                .eq('id', 1);
+            // Predict for visual speed
+            const countEl = document.getElementById('count');
+            countEl.innerText = parseInt(countEl.innerText) + 1;
+
+            // Push to Supabase using the secure RPC function
+            const { error } = await supabase.rpc('increment_simple', { p_name: myName });
+            if (error) console.error("Click failed:", error);
         }
 
         function updateUI(data) {
             if(!data) return;
-            currentClicks = data.total_clicks;
-            document.getElementById('count').innerText = currentClicks;
+            document.getElementById('count').innerText = data.total_clicks;
             document.getElementById('last-person').innerText = data.last_person;
         }
     </script>
