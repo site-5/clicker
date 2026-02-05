@@ -24,8 +24,9 @@
             position: absolute; 
             top: 0; left: 0;
             width: 100%;
+            /* Removed fixed height to let JS control it via resize() */
             pointer-events: none;
-            z-index: 9999;
+            z-index: 9998;
         }
 
         .remote-cursor {
@@ -107,7 +108,7 @@
             flex-direction: column; 
             align-items: center; 
             justify-content: center; 
-            z-index: 1000; 
+            z-index: 1001; 
             color: white; 
             cursor: auto;
         }
@@ -139,7 +140,7 @@
             box-shadow: 0 0 20px rgba(16, 185, 129, 0.2);
         }
 
-        #game-container { display: none; flex-direction: column; align-items: center; width: 100%; max-width: 700px; padding-bottom: 50px; }
+        #game-container { display: none; flex-direction: column; align-items: center; width: 100%; max-width: 700px; padding-bottom: 100px; }
         
         .shop { 
             margin-top: 50px; 
@@ -268,34 +269,43 @@
             starsContainer.appendChild(star);
         }
 
-        // FIX: Optimized Particle Engine
+        // FIX: Robust Particle Engine for Scrollable Sites
         const canvas = document.getElementById('trail-canvas');
         const ctx = canvas.getContext('2d');
         let particles = [];
         
-        function resize() { 
+        function resizeCanvas() { 
             canvas.width = window.innerWidth; 
-            // Ensures canvas grows with the document
-            canvas.height = Math.max(document.body.scrollHeight, document.documentElement.scrollHeight); 
+            // Ensures canvas height perfectly matches current document scroll height
+            canvas.height = Math.max(
+                document.body.scrollHeight, 
+                document.documentElement.scrollHeight,
+                document.body.offsetHeight, 
+                document.documentElement.offsetHeight,
+                document.body.clientHeight, 
+                document.documentElement.clientHeight
+            );
         }
-        window.onresize = resize; 
-        setInterval(resize, 1000); // Verify height stability
+        window.addEventListener('resize', resizeCanvas);
+        // Interval to handle canvas size updates when content (shop) shifts
+        setInterval(resizeCanvas, 500); 
 
         class Particle {
             constructor(x, y, color) {
                 this.x = x; this.y = y; this.color = color;
-                this.size = Math.random() * 4 + 1;
-                this.speedX = Math.random() * 2 - 1;
-                this.speedY = Math.random() * 2 - 1;
+                this.size = Math.random() * 3.5 + 2;
+                this.speedX = (Math.random() - 0.5) * 1.5;
+                this.speedY = (Math.random() - 0.5) * 1.5;
                 this.life = 1.0;
             }
             update() {
                 this.x += this.speedX; this.y += this.speedY;
-                this.life -= 0.025; 
+                this.life -= 0.02; if(this.size > 0.1) this.size -= 0.04;
             }
             draw() {
                 ctx.fillStyle = this.color;
                 ctx.globalAlpha = this.life;
+                // Shadow blur is expensive, optimized to use simpler circles
                 ctx.beginPath();
                 ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
                 ctx.fill();
@@ -331,8 +341,8 @@
 
             function getCursorColor(name) {
                 const n = name.toLowerCase();
-                if (n === 'grace') return '#FFD700'; 
-                if (n === 'derrick') return '#4466FF'; 
+                if (n === 'grace') return '#FFFDDE'; // Bright Gold
+                if (n === 'derrick') return '#7BBFFB'; // Visible Light Blue
                 return '#FFFFFF';
             }
 
@@ -340,18 +350,19 @@
                 userName = nameInput.value.trim();
                 if(!userName) return alert("Enter a name!");
 
-                const validUsers = ['derrick', 'grace'];
-                if (!validUsers.includes(userName.toLowerCase())) {
-                    alert("Unauthorized access.");
+                const validAllowed = ['derrick', 'grace'];
+                if (!validAllowed.includes(userName.toLowerCase())) {
+                    alert("Unauthorized user detected.");
                     return;
                 }
 
                 nameOverlay.style.display = "none";
                 gameContainer.style.display = "flex";
-                resize(); 
+                resizeCanvas(); 
                 
                 document.addEventListener('mousemove', (e) => {
                     const color = getCursorColor(userName);
+                    // Use PageX/Y for absolute canvas tracking
                     particles.push(new Particle(e.pageX, e.pageY, color));
                     
                     if (!cursors['self']) {
@@ -398,6 +409,7 @@
                 nameDisplay.innerText = "Last Clicked By: " + (data.last_name || "None");
                 rateDisplay.innerText = (data.auto_rate || 0).toLocaleString();
                 document.getElementById('last-purchase').innerText = "Last Purchase: " + (data.last_purchase_name || "None");
+                
                 for(let i=1; i<=10; i++) {
                     const el = document.getElementById(`u${i}-last`);
                     if(el) el.innerText = "Last Buyer: " + (data[`last_u${i}_name`] || "None");
