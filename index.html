@@ -7,19 +7,25 @@
     <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
     <style>
         body { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; font-family: sans-serif; background: #f0f2f5; }
-        #counter { font-size: 5rem; margin-bottom: 20px; color: #1e293b; }
+        #counter { font-size: 5rem; margin-bottom: 5px; color: #1e293b; }
+        #last-clicked { font-size: 1.2rem; margin-bottom: 20px; color: #64748b; font-weight: bold; }
         button { padding: 15px 40px; font-size: 1.5rem; cursor: pointer; background: #3b82f6; color: white; border: none; border-radius: 8px; }
     </style>
 </head>
 <body>
 
     <div id="counter">loading...</div>
+    <div id="last-clicked">Waiting for data...</div>
     <button id="click-btn">CLICK ME</button>
 
     <script>
         // Use a timeout to ensure everything is loaded
         window.onload = async function() {
+            // NEW: Prompt for name before starting
+            let userName = prompt("Enter your name to start clicking:") || "Anonymous";
+
             const counterDisplay = document.getElementById('counter');
+            const nameDisplay = document.getElementById('last-clicked');
             
             // STEP 1: Check if Supabase library exists
             if (!window.supabase) {
@@ -41,9 +47,10 @@
             async function fetchCount() {
                 console.log("Attempting fetch...");
                 try {
+                    // UPDATED: Now selecting last_name as well
                     const { data, error } = await supabase
                         .from('clicks')
-                        .select('count')
+                        .select('count, last_name')
                         .eq('id', 1)
                         .single();
 
@@ -52,6 +59,8 @@
                         counterDisplay.innerText = "DB Error";
                     } else if (data) {
                         counterDisplay.innerText = data.count;
+                        // NEW: Update name display
+                        nameDisplay.innerText = "Last Clicked By: " + (data.last_name || "None");
                     } else {
                         alert("Fetch successful, but NO DATA found. Did you insert the row with ID 1?");
                         counterDisplay.innerText = "No Row";
@@ -64,11 +73,18 @@
             // STEP 3: Handle Clicks
             document.getElementById('click-btn').addEventListener('click', async () => {
                 const current = parseInt(counterDisplay.innerText) || 0;
-                counterDisplay.innerText = current + 1; // Optimistic
+                
+                // Optimistic UI updates
+                counterDisplay.innerText = current + 1; 
+                nameDisplay.innerText = "Last Clicked By: " + userName;
 
+                // UPDATED: Now updating last_name in the database
                 const { error } = await supabase
                     .from('clicks')
-                    .update({ count: current + 1 })
+                    .update({ 
+                        count: current + 1,
+                        last_name: userName
+                    })
                     .eq('id', 1);
 
                 if (error) alert("Update Failed: " + error.message);
@@ -79,6 +95,8 @@
                 .on('postgres_changes', { event: '*', schema: 'public', table: 'clicks' }, payload => {
                     if (payload.new && payload.new.count !== undefined) {
                         counterDisplay.innerText = payload.new.count;
+                        // NEW: Update name in realtime
+                        nameDisplay.innerText = "Last Clicked By: " + (payload.new.last_name || "Anonymous");
                     }
                 })
                 .subscribe();
