@@ -17,6 +17,42 @@
             padding: 20px; 
             overflow-x: hidden;
             color: white;
+            cursor: crosshair; /* Themed cursor */
+        }
+
+        /* NEW: Cursor & Trail Styles */
+        .remote-cursor {
+            position: fixed;
+            width: 15px;
+            height: 15px;
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: 10000;
+            transform: translate(-50%, -50%);
+            transition: transform 0.05s linear;
+            box-shadow: 0 0 10px rgba(255,255,255,0.5);
+        }
+        .cursor-label {
+            position: absolute;
+            top: -20px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 10px;
+            font-weight: 800;
+            white-space: nowrap;
+            text-transform: uppercase;
+        }
+        .trail {
+            position: fixed;
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: 9999;
+            animation: fadeOut 0.6s forwards;
+        }
+        @keyframes fadeOut {
+            to { opacity: 0; transform: scale(0.1) translateY(10px); }
         }
 
         /* Animated Stars Background */
@@ -46,6 +82,7 @@
             color: #facc15; 
             text-shadow: 0 0 30px rgba(250, 204, 21, 0.4);
             font-weight: 800;
+            user-select: none;
         }
 
         #last-clicked { 
@@ -58,6 +95,7 @@
             padding: 8px 25px;
             border-radius: 50px;
             border: 1px solid rgba(255,255,255,0.1);
+            user-select: none;
         }
 
         button#click-btn { 
@@ -167,6 +205,7 @@
 <body>
 
     <div class="stars-container" id="stars"></div>
+    <div id="cursor-container"></div> <!-- Container for remote users -->
 
     <!-- INITIAL SCREEN -->
     <div id="name-overlay">
@@ -187,9 +226,7 @@
             <h2>Upgrades</h2>
             <div id="last-purchase">Last Purchase: None</div>
             
-            <!-- Upgrade List x10 -->
             <div id="upgrade-list">
-                <!-- Javascript will populate this or we can hardcode for performance -->
                 <div class="upgrade-card">
                     <div class="upgrade-info"><b>Small Satellite (+0.1)</b><span id="u1-last">Last Buyer: None</span></div>
                     <button class="buy-btn" onclick="buyUpgrade(0.1, 50, 'u1')">50</button>
@@ -269,13 +306,73 @@
             
             let userName = "";
 
+            // NEW: Cursor logic variables
+            const cursors = {};
+            const cursorContainer = document.getElementById('cursor-container');
+
+            function getCursorColor(name) {
+                const n = name.toLowerCase();
+                if (n === 'grace') return '#FFD700'; // Gold
+                if (n === 'derrick') return '#000080'; // Navy Blue
+                return '#FFFFFF';
+            }
+
+            function createTrail(x, y, color) {
+                const trail = document.createElement('div');
+                trail.className = 'trail';
+                trail.style.left = x + 'px';
+                trail.style.top = y + 'px';
+                trail.style.backgroundColor = color;
+                trail.style.boxShadow = `0 0 8px ${color}`;
+                document.body.appendChild(trail);
+                setTimeout(() => trail.remove(), 600);
+            }
+
             document.getElementById('start-btn').onclick = function() {
                 userName = nameInput.value.trim();
                 if(!userName) { alert("Enter a name!"); return; }
                 nameOverlay.style.display = "none";
                 gameContainer.style.display = "flex";
+                
+                // Track mouse and broadcast
+                document.addEventListener('mousemove', (e) => {
+                    const color = getCursorColor(userName);
+                    if (userName.toLowerCase() === 'grace' || userName.toLowerCase() === 'derrick') {
+                        createTrail(e.clientX, e.clientY, color);
+                    }
+                    supabase.channel('cursors').send({
+                        type: 'broadcast',
+                        event: 'move',
+                        payload: { x: e.clientX, y: e.clientY, name: userName }
+                    });
+                });
+
                 fetchCount();
             };
+
+            // NEW: Listen for mouse movement from others
+            supabase.channel('cursors').on('broadcast', { event: 'move' }, ({ payload }) => {
+                if (payload.name === userName) return;
+
+                if (!cursors[payload.name]) {
+                    const el = document.createElement('div');
+                    el.className = 'remote-cursor';
+                    el.style.backgroundColor = getCursorColor(payload.name);
+                    el.innerHTML = `<div class="cursor-label">${payload.name}</div>`;
+                    cursorContainer.appendChild(el);
+                    cursors[payload.name] = el;
+                }
+
+                const cursorEl = cursors[payload.name];
+                cursorEl.style.left = payload.x + 'px';
+                cursorEl.style.top = payload.y + 'px';
+
+                // Trails for others
+                const pName = payload.name.toLowerCase();
+                if (pName === 'grace' || pName === 'derrick') {
+                    createTrail(payload.x, payload.y, getCursorColor(payload.name));
+                }
+            }).subscribe();
 
             async function fetchCount() {
                 const { data, error } = await supabase.from('clicks').select('*').eq('id', 1).single();
@@ -288,13 +385,11 @@
                 rateDisplay.innerText = (data.auto_rate || 0).toLocaleString();
                 document.getElementById('last-purchase').innerText = "Last Purchase: " + (data.last_purchase_name || "None");
                 
-                // Update specific upgrade buyers
                 for(let i=1; i<=10; i++) {
                     const el = document.getElementById(`u${i}-last`);
                     if(el) el.innerText = "Last Buyer: " + (data[`last_u${i}_name`] || "None");
                 }
                 
-                // Button disabling logic
                 const costs = [50, 400, 3000, 15000, 80000, 400000, 1500000, 8000000, 50000000, 250000000];
                 document.querySelectorAll('.buy-btn').forEach((btn, idx) => {
                     btn.disabled = data.count < costs[idx];
