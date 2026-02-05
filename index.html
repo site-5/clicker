@@ -17,20 +17,19 @@
             padding: 20px; 
             overflow-x: hidden;
             color: white;
-            cursor: none; /* Hide default for custom cursor */
+            cursor: none; 
         }
 
-        /* NEW: Premium Cursor & Label Styles */
         #trail-canvas {
-            position: fixed;
+            position: absolute; 
             top: 0; left: 0;
-            width: 100%; height: 100%;
+            width: 100%;
             pointer-events: none;
             z-index: 9999;
         }
 
         .remote-cursor {
-            position: fixed;
+            position: absolute; 
             width: 8px; height: 8px;
             border-radius: 50%;
             pointer-events: none;
@@ -41,24 +40,6 @@
             border: 2px solid white;
         }
 
-        .cursor-label {
-            position: absolute;
-            top: -25px;
-            left: 50%;
-            transform: translateX(-50%);
-            font-size: 11px;
-            font-weight: 900;
-            white-space: nowrap;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            background: rgba(0,0,0,0.6);
-            padding: 2px 8px;
-            border-radius: 4px;
-            color: white !important;
-            border: 1px solid rgba(255,255,255,0.2);
-        }
-
-        /* Animated Stars Background */
         .stars-container {
             position: fixed;
             top: 0; left: 0; width: 100%; height: 100%;
@@ -118,7 +99,6 @@
         button#click-btn:hover { background: #2563eb; transform: translateY(-2px); }
         button#click-btn:active { transform: scale(0.95); }
 
-        /* Initial Name Screen */
         #name-overlay { 
             position: fixed; 
             top: 0; left: 0; width: 100%; height: 100%; 
@@ -159,7 +139,6 @@
             box-shadow: 0 0 20px rgba(16, 185, 129, 0.2);
         }
 
-        /* Shop Section */
         #game-container { display: none; flex-direction: column; align-items: center; width: 100%; max-width: 700px; padding-bottom: 50px; }
         
         .shop { 
@@ -276,7 +255,6 @@
     </div>
 
     <script>
-        // Star Background
         const starsContainer = document.getElementById('stars');
         for (let i = 0; i < 150; i++) {
             const star = document.createElement('div');
@@ -290,30 +268,34 @@
             starsContainer.appendChild(star);
         }
 
-        // NEW: High-End Particle Engine for Trails
+        // FIX: Optimized Particle Engine
         const canvas = document.getElementById('trail-canvas');
         const ctx = canvas.getContext('2d');
         let particles = [];
         
-        function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
-        window.onresize = resize; resize();
+        function resize() { 
+            canvas.width = window.innerWidth; 
+            // Ensures canvas grows with the document
+            canvas.height = Math.max(document.body.scrollHeight, document.documentElement.scrollHeight); 
+        }
+        window.onresize = resize; 
+        setInterval(resize, 1000); // Verify height stability
 
         class Particle {
             constructor(x, y, color) {
                 this.x = x; this.y = y; this.color = color;
-                this.size = Math.random() * 4 + 2;
+                this.size = Math.random() * 4 + 1;
                 this.speedX = Math.random() * 2 - 1;
                 this.speedY = Math.random() * 2 - 1;
                 this.life = 1.0;
             }
             update() {
                 this.x += this.speedX; this.y += this.speedY;
-                this.life -= 0.02; if(this.size > 0.1) this.size -= 0.05;
+                this.life -= 0.025; 
             }
             draw() {
                 ctx.fillStyle = this.color;
                 ctx.globalAlpha = this.life;
-                ctx.shadowBlur = 10; ctx.shadowColor = this.color;
                 ctx.beginPath();
                 ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
                 ctx.fill();
@@ -323,7 +305,8 @@
         function animateParticles() {
             ctx.clearRect(0,0, canvas.width, canvas.height);
             for (let i = 0; i < particles.length; i++) {
-                particles[i].update(); particles[i].draw();
+                particles[i].update(); 
+                particles[i].draw();
                 if (particles[i].life <= 0) { particles.splice(i, 1); i--; }
             }
             requestAnimationFrame(animateParticles);
@@ -348,36 +331,42 @@
 
             function getCursorColor(name) {
                 const n = name.toLowerCase();
-                if (n === 'grace') return '#FFD700'; // Gold
-                if (n === 'derrick') return '#4466FF'; // Navy Blue (Brightened for visibility)
+                if (n === 'grace') return '#FFD700'; 
+                if (n === 'derrick') return '#4466FF'; 
                 return '#FFFFFF';
             }
 
             document.getElementById('start-btn').onclick = function() {
                 userName = nameInput.value.trim();
                 if(!userName) return alert("Enter a name!");
+
+                const validUsers = ['derrick', 'grace'];
+                if (!validUsers.includes(userName.toLowerCase())) {
+                    alert("Unauthorized access.");
+                    return;
+                }
+
                 nameOverlay.style.display = "none";
                 gameContainer.style.display = "flex";
+                resize(); 
                 
                 document.addEventListener('mousemove', (e) => {
                     const color = getCursorColor(userName);
-                    particles.push(new Particle(e.clientX, e.clientY, color));
+                    particles.push(new Particle(e.pageX, e.pageY, color));
                     
-                    // Local Cursor for Self
                     if (!cursors['self']) {
                         const el = document.createElement('div');
                         el.className = 'remote-cursor';
                         el.style.color = color;
-                        el.innerHTML = `<div class="cursor-label">${userName}</div>`;
                         cursorContainer.appendChild(el);
                         cursors['self'] = el;
                     }
-                    cursors['self'].style.left = e.clientX + 'px';
-                    cursors['self'].style.top = e.clientY + 'px';
+                    cursors['self'].style.left = e.pageX + 'px';
+                    cursors['self'].style.top = e.pageY + 'px';
 
                     supabase.channel('cursors').send({
                         type: 'broadcast', event: 'move', 
-                        payload: { x: e.clientX, y: e.clientY, name: userName }
+                        payload: { x: e.pageX, y: e.pageY, name: userName }
                     });
                 });
                 fetchCount();
@@ -391,7 +380,6 @@
                     const el = document.createElement('div');
                     el.className = 'remote-cursor';
                     el.style.color = color;
-                    el.innerHTML = `<div class="cursor-label">${payload.name}</div>`;
                     cursorContainer.appendChild(el);
                     cursors[payload.name] = el;
                 }
@@ -400,7 +388,6 @@
                 particles.push(new Particle(payload.x, payload.y, color));
             }).subscribe();
 
-            // Original Logic preserved below
             async function fetchCount() {
                 const { data } = await supabase.from('clicks').select('*').eq('id', 1).single();
                 if (data) updateUI(data);
