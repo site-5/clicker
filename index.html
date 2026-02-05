@@ -2,18 +2,16 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Global Clicker: Star Edition</title>
-    <!-- 1. Supabase Library -->
+    <title>Global Clicker</title>
     <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
     <style>
-        /* EXISTING STYLES + STAR THEME OVERRIDES */
         body { 
             display: flex; 
             flex-direction: column; 
             align-items: center; 
             justify-content: center; 
             min-height: 100vh; 
-            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; 
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
             background: radial-gradient(ellipse at bottom, #1B2735 0%, #090A0F 100%); 
             margin: 0; 
             padding: 20px; 
@@ -29,7 +27,6 @@
             pointer-events: none;
         }
 
-        /* Create 3 layers of stars with different speeds */
         .star {
             position: absolute;
             background: white;
@@ -47,34 +44,37 @@
             font-size: 6rem; 
             margin-bottom: 5px; 
             color: #facc15; 
-            text-shadow: 0 0 20px rgba(250, 204, 21, 0.5);
-            font-weight: bold;
+            text-shadow: 0 0 30px rgba(250, 204, 21, 0.4);
+            font-weight: 800;
         }
 
         #last-clicked { 
-            font-size: 1.2rem; 
-            margin-bottom: 20px; 
+            font-size: 1rem; 
+            margin-bottom: 25px; 
             color: #94a3b8; 
-            font-weight: bold; 
+            text-transform: uppercase;
+            letter-spacing: 1px;
             background: rgba(255,255,255,0.05);
-            padding: 8px 20px;
+            padding: 8px 25px;
             border-radius: 50px;
             border: 1px solid rgba(255,255,255,0.1);
         }
 
         button#click-btn { 
-            padding: 20px 50px; 
-            font-size: 2rem; 
+            padding: 20px 60px; 
+            font-size: 2.2rem; 
             cursor: pointer; 
-            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); 
+            background: #3b82f6; 
             color: white; 
             border: none; 
-            border-radius: 15px; 
-            transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275); 
-            box-shadow: 0 0 30px rgba(59, 130, 246, 0.4);
+            border-radius: 16px; 
+            transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1); 
+            box-shadow: 0 0 40px rgba(59, 130, 246, 0.3);
+            font-weight: bold;
         }
 
-        button#click-btn:active { transform: scale(0.9); box-shadow: 0 0 10px rgba(59, 130, 246, 0.6); }
+        button#click-btn:hover { background: #2563eb; transform: translateY(-2px); }
+        button#click-btn:active { transform: scale(0.95); }
 
         /* Initial Name Screen */
         #name-overlay { 
@@ -89,129 +89,158 @@
             color: white; 
         }
         
-        #name-overlay h1 { font-size: 3.5rem; color: #facc15; margin-bottom: 10px; text-shadow: 0 0 15px rgba(250, 204, 21, 0.4); }
+        #name-overlay h1 { font-size: 4rem; color: #facc15; margin-bottom: 20px; text-shadow: 0 0 20px rgba(250, 204, 21, 0.3); }
 
         #name-overlay input { 
-            padding: 15px; 
-            font-size: 1.5rem; 
+            padding: 18px; 
+            font-size: 1.4rem; 
             border-radius: 12px; 
             border: 2px solid #334155; 
             background: #1e293b;
             color: white;
-            margin-bottom: 20px; 
-            width: 320px; 
+            margin-bottom: 25px; 
+            width: 350px; 
             text-align: center; 
             outline: none;
         }
 
         #name-overlay button { 
             background: #10b981; 
-            padding: 15px 40px;
+            padding: 16px 50px;
             border-radius: 12px;
+            font-size: 1.2rem;
             font-weight: bold;
-            box-shadow: 0 0 20px rgba(16, 185, 129, 0.3);
+            color: white;
+            border: none;
+            cursor: pointer;
+            box-shadow: 0 0 20px rgba(16, 185, 129, 0.2);
         }
 
         /* Shop Section */
-        #game-container { display: none; flex-direction: column; align-items: center; width: 100%; max-width: 650px; }
+        #game-container { display: none; flex-direction: column; align-items: center; width: 100%; max-width: 700px; padding-bottom: 50px; }
         
         .shop { 
-            margin-top: 40px; 
+            margin-top: 50px; 
             width: 100%; 
-            background: rgba(30, 41, 59, 0.7); 
-            backdrop-filter: blur(10px);
-            padding: 25px; 
-            border-radius: 20px; 
+            background: rgba(15, 23, 42, 0.8); 
+            backdrop-filter: blur(12px);
+            padding: 30px; 
+            border-radius: 24px; 
             border: 1px solid rgba(255,255,255,0.1);
-            box-shadow: 0 20px 50px rgba(0,0,0,0.5); 
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5); 
         }
 
-        .shop h2 { margin-top: 0; color: #facc15; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 15px; }
+        .shop h2 { margin: 0 0 20px 0; font-size: 1.8rem; color: #facc15; }
         
         .upgrade-card { 
             display: flex; 
             justify-content: space-between; 
             align-items: center; 
-            padding: 15px; 
+            padding: 18px 0; 
             border-bottom: 1px solid rgba(255,255,255,0.05); 
         }
 
-        .upgrade-info { display: flex; flex-direction: column; }
-        .upgrade-info b { font-size: 1.15rem; color: #f8fafc; }
-        .upgrade-info span { font-size: 0.85rem; color: #94a3b8; }
+        .upgrade-info { display: flex; flex-direction: column; gap: 4px; }
+        .upgrade-info b { font-size: 1.1rem; color: #f8fafc; }
+        .upgrade-info span { font-size: 0.85rem; color: #64748b; font-weight: 500; }
 
         .buy-btn { 
-            padding: 10px 20px; 
+            padding: 12px 24px; 
             font-size: 1rem; 
             background: #10b981; 
-            font-weight: bold;
-            border-radius: 8px;
+            color: white;
+            border: none;
+            font-weight: 700;
+            border-radius: 10px;
+            cursor: pointer;
+            min-width: 120px;
+            transition: all 0.2s;
         }
 
-        .buy-btn:disabled { background: #334155; color: #64748b; cursor: not-allowed; opacity: 0.6; }
+        .buy-btn:hover:not(:disabled) { background: #059669; }
+        .buy-btn:disabled { background: #334155; color: #64748b; cursor: not-allowed; }
         
-        #global-stats { margin-top: 15px; font-size: 1rem; color: #94a3b8; font-weight: bold; }
-        #last-purchase { font-size: 0.95rem; color: #fb7185; margin-bottom: 15px; font-weight: bold; }
+        #global-stats { margin-top: 20px; font-size: 1.1rem; color: #94a3b8; font-weight: 600; }
+        #last-purchase { font-size: 0.9rem; color: #fb7185; margin-bottom: 20px; font-weight: 700; text-transform: uppercase; }
     </style>
 </head>
 <body>
 
     <div class="stars-container" id="stars"></div>
 
-    <!-- INITIAL SCREEN: User must enter name -->
+    <!-- INITIAL SCREEN -->
     <div id="name-overlay">
-        <h1>🌟 STAR CLICKER</h1>
-        <p style="color: #94a3b8;">The universe is waiting for your input.</p>
-        <input type="text" id="name-input" placeholder="Enter Pilot Name..." maxlength="15">
-        <button id="start-btn">IGNITE ENGINES</button>
+        <h1>GLOBAL CLICKER</h1>
+        <input type="text" id="name-input" placeholder="Your Name" maxlength="15">
+        <button id="start-btn">ENTER GAME</button>
     </div>
 
     <!-- MAIN GAME -->
     <div id="game-container">
-        <div id="counter">loading...</div>
-        <div id="last-clicked">Awaiting Data Transmission...</div>
-        <button id="click-btn">GENERATE STARLIGHT</button>
+        <div id="counter">0</div>
+        <div id="last-clicked">Awaiting Data...</div>
+        <button id="click-btn">CLICK</button>
         
-        <div id="global-stats">Celestial Auto-Rate: <span id="auto-rate-val" style="color:#facc15">0</span> CPS</div>
+        <div id="global-stats">Auto Rate: <span id="auto-rate-val" style="color:#facc15">0</span> CPS</div>
 
-        <!-- Shop Section -->
         <div class="shop">
-            <h2>Cosmic Shipments</h2>
-            <div id="last-purchase">Recent Discovery: None</div>
+            <h2>Upgrades</h2>
+            <div id="last-purchase">Last Purchase: None</div>
             
-            <div class="upgrade-card">
-                <div class="upgrade-info">
-                    <b>Micro-Satellite (+0.1/s)</b>
-                    <span id="u1-last">Last Buyer: None</span>
+            <!-- Upgrade List x10 -->
+            <div id="upgrade-list">
+                <!-- Javascript will populate this or we can hardcode for performance -->
+                <div class="upgrade-card">
+                    <div class="upgrade-info"><b>Small Satellite (+0.1)</b><span id="u1-last">Last Buyer: None</span></div>
+                    <button class="buy-btn" onclick="buyUpgrade(0.1, 50, 'u1')">50</button>
                 </div>
-                <button class="buy-btn" onclick="buyUpgrade(0.1, 50, 'u1')">Buy: 50</button>
-            </div>
-
-            <div class="upgrade-card">
-                <div class="upgrade-info">
-                    <b>Lunar Outpost (+1/s)</b>
-                    <span id="u2-last">Last Buyer: None</span>
+                <div class="upgrade-card">
+                    <div class="upgrade-info"><b>Lunar Base (+1.0)</b><span id="u2-last">Last Buyer: None</span></div>
+                    <button class="buy-btn" onclick="buyUpgrade(1, 400, 'u2')">400</button>
                 </div>
-                <button class="buy-btn" onclick="buyUpgrade(1, 400, 'u2')">Buy: 400</button>
-            </div>
-
-            <div class="upgrade-card">
-                <div class="upgrade-info">
-                    <b>Fusion Reactor (+10/s)</b>
-                    <span id="u3-last">Last Buyer: None</span>
+                <div class="upgrade-card">
+                    <div class="upgrade-info"><b>Fusion Reactor (+10)</b><span id="u3-last">Last Buyer: None</span></div>
+                    <button class="buy-btn" onclick="buyUpgrade(10, 3000, 'u3')">3000</button>
                 </div>
-                <button class="buy-btn" onclick="buyUpgrade(10, 3000, 'u3')">Buy: 3000</button>
+                <div class="upgrade-card">
+                    <div class="upgrade-info"><b>Solar Array (+50)</b><span id="u4-last">Last Buyer: None</span></div>
+                    <button class="buy-btn" onclick="buyUpgrade(50, 15000, 'u4')">15000</button>
+                </div>
+                <div class="upgrade-card">
+                    <div class="upgrade-info"><b>Deep Space Hub (+200)</b><span id="u5-last">Last Buyer: None</span></div>
+                    <button class="buy-btn" onclick="buyUpgrade(200, 80000, 'u5')">80000</button>
+                </div>
+                <div class="upgrade-card">
+                    <div class="upgrade-info"><b>Star Factory (+800)</b><span id="u6-last">Last Buyer: None</span></div>
+                    <button class="buy-btn" onclick="buyUpgrade(800, 400000, 'u6')">400000</button>
+                </div>
+                <div class="upgrade-card">
+                    <div class="upgrade-info"><b>Nebula Harvester (+2.5k)</b><span id="u7-last">Last Buyer: None</span></div>
+                    <button class="buy-btn" onclick="buyUpgrade(2500, 1500000, 'u7')">1.5M</button>
+                </div>
+                <div class="upgrade-card">
+                    <div class="upgrade-info"><b>Galactic Pulse (+8k)</b><span id="u8-last">Last Buyer: None</span></div>
+                    <button class="buy-btn" onclick="buyUpgrade(8000, 8000000, 'u8')">8M</button>
+                </div>
+                <div class="upgrade-card">
+                    <div class="upgrade-info"><b>Void Engine (+25k)</b><span id="u9-last">Last Buyer: None</span></div>
+                    <button class="buy-btn" onclick="buyUpgrade(25000, 50000000, 'u9')">50M</button>
+                </div>
+                <div class="upgrade-card">
+                    <div class="upgrade-info"><b>Singularity (+100k)</b><span id="u10-last">Last Buyer: None</span></div>
+                    <button class="buy-btn" onclick="buyUpgrade(100000, 250000000, 'u10')">250M</button>
+                </div>
             </div>
         </div>
     </div>
 
     <script>
-        // Generate Stars Background
+        // Star Background Generation
         const starsContainer = document.getElementById('stars');
         for (let i = 0; i < 150; i++) {
             const star = document.createElement('div');
             star.className = 'star';
-            const size = Math.random() * 3 + 'px';
+            const size = (Math.random() * 2 + 1) + 'px';
             star.style.width = size;
             star.style.height = size;
             star.style.left = Math.random() * 100 + '%';
@@ -222,9 +251,8 @@
         }
 
         window.onload = async function() {
-            // STEP 1: Supabase Initialization
             if (!window.supabase) {
-                alert("CRITICAL ERROR: Supabase library failed to load! Disable AdBlock.");
+                alert("Library Error: Check internet connection.");
                 return;
             }
 
@@ -237,104 +265,73 @@
             const gameContainer = document.getElementById('game-container');
             const nameOverlay = document.getElementById('name-overlay');
             const nameInput = document.getElementById('name-input');
+            const rateDisplay = document.getElementById('auto-rate-val');
             
             let userName = "";
 
-            // Handle Game Start
             document.getElementById('start-btn').onclick = function() {
                 userName = nameInput.value.trim();
-                if(!userName) { alert("Pilot name required for flight!"); return; }
+                if(!userName) { alert("Enter a name!"); return; }
                 nameOverlay.style.display = "none";
                 gameContainer.style.display = "flex";
                 fetchCount();
             };
 
-            // Fetch Logic (Original remains untouched)
             async function fetchCount() {
-                try {
-                    const { data, error } = await supabase
-                        .from('clicks')
-                        .select('*')
-                        .eq('id', 1)
-                        .single();
-
-                    if (error) {
-                        alert("Database Query Error: " + error.message);
-                        counterDisplay.innerText = "DB Error";
-                    } else if (data) {
-                        updateUI(data);
-                    }
-                } catch (e) {
-                    alert("Network/Script Crash: " + e.message);
-                }
+                const { data, error } = await supabase.from('clicks').select('*').eq('id', 1).single();
+                if (data) updateUI(data);
             }
 
-            // UI Refresh Logic
             function updateUI(data) {
-                counterDisplay.innerText = Math.floor(data.count);
-                nameDisplay.innerText = "Last Spark By: " + (data.last_name || "Unkown");
-                document.getElementById('auto-rate-val').innerText = data.auto_rate || 0;
-                document.getElementById('last-purchase').innerText = "Recent Discovery: " + (data.last_purchase_name || "None");
-                document.getElementById('u1-last').innerText = "Last Buyer: " + (data.last_u1_name || "None");
-                document.getElementById('u2-last').innerText = "Last Buyer: " + (data.last_u2_name || "None");
-                document.getElementById('u3-last').innerText = "Last Buyer: " + (data.last_u3_name || "None");
+                counterDisplay.innerText = Math.floor(data.count).toLocaleString();
+                nameDisplay.innerText = "Last Clicked By: " + (data.last_name || "None");
+                rateDisplay.innerText = (data.auto_rate || 0).toLocaleString();
+                document.getElementById('last-purchase').innerText = "Last Purchase: " + (data.last_purchase_name || "None");
                 
-                const buttons = document.querySelectorAll('.buy-btn');
-                const costs = [50, 400, 3000];
-                buttons.forEach((btn, idx) => {
+                // Update specific upgrade buyers
+                for(let i=1; i<=10; i++) {
+                    const el = document.getElementById(`u${i}-last`);
+                    if(el) el.innerText = "Last Buyer: " + (data[`last_u${i}_name`] || "None");
+                }
+                
+                // Button disabling logic
+                const costs = [50, 400, 3000, 15000, 80000, 400000, 1500000, 8000000, 50000000, 250000000];
+                document.querySelectorAll('.buy-btn').forEach((btn, idx) => {
                     btn.disabled = data.count < costs[idx];
                 });
             }
 
-            // Purchase Logic
             window.buyUpgrade = async function(rateAdd, cost, column) {
-                const currentCount = parseInt(counterDisplay.innerText);
+                const currentCount = parseFloat(counterDisplay.innerText.replace(/,/g, ''));
                 if(currentCount < cost) return;
 
-                const { error: upError } = await supabase.from('clicks').update({
+                const { error } = await supabase.from('clicks').update({
                     count: currentCount - cost,
-                    auto_rate: parseFloat(document.getElementById('auto-rate-val').innerText) + rateAdd,
+                    auto_rate: parseFloat(rateDisplay.innerText.replace(/,/g, '')) + rateAdd,
                     last_purchase_name: userName,
                     [`last_${column}_name`]: userName
                 }).eq('id', 1);
-                
-                if(upError) alert("Transmission Interrupted: " + upError.message);
+                if(error) alert("Purchase Error: " + error.message);
             }
 
-            // Manual Click Logic
             document.getElementById('click-btn').addEventListener('click', async () => {
-                const current = parseInt(counterDisplay.innerText) || 0;
-                counterDisplay.innerText = current + 1; 
-                nameDisplay.innerText = "Last Spark By: " + userName;
+                const current = parseFloat(counterDisplay.innerText.replace(/,/g, '')) || 0;
+                counterDisplay.innerText = (current + 1).toLocaleString();
+                nameDisplay.innerText = "Last Clicked By: " + userName;
 
-                const { error } = await supabase
-                    .from('clicks')
-                    .update({ 
-                        count: current + 1,
-                        last_name: userName
-                    })
-                    .eq('id', 1);
-
-                if (error) alert("Pulse Failed: " + error.message);
+                await supabase.from('clicks').update({ count: current + 1, last_name: userName }).eq('id', 1);
             });
 
-            // Auto-Clicker Process (Preserved)
             setInterval(async () => {
-                const rate = parseFloat(document.getElementById('auto-rate-val').innerText) || 0;
+                const rate = parseFloat(rateDisplay.innerText.replace(/,/g, '')) || 0;
                 if(rate > 0) {
-                    // This expects the RPC 'increment_auto_clicks' to exist in SQL
                     await supabase.rpc('increment_auto_clicks', { amount: rate });
                 }
             }, 1000);
 
-            // Realtime listener (Original logic)
-            supabase.channel('any')
-                .on('postgres_changes', { event: '*', schema: 'public', table: 'clicks' }, payload => {
-                    if (payload.new) {
-                        updateUI(payload.new);
-                    }
-                })
-                .subscribe();
+            supabase.channel('any').on('postgres_changes', { event: '*', schema: 'public', table: 'clicks' }, payload => {
+                if (payload.new) updateUI(payload.new);
+            }).subscribe();
         };
     </script>
 </body>
