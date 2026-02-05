@@ -17,42 +17,45 @@
             padding: 20px; 
             overflow-x: hidden;
             color: white;
-            cursor: crosshair; /* Themed cursor */
+            cursor: none; /* Hide default for custom cursor */
         }
 
-        /* NEW: Cursor & Trail Styles */
+        /* NEW: Premium Cursor & Label Styles */
+        #trail-canvas {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            pointer-events: none;
+            z-index: 9999;
+        }
+
         .remote-cursor {
             position: fixed;
-            width: 15px;
-            height: 15px;
+            width: 8px; height: 8px;
             border-radius: 50%;
             pointer-events: none;
             z-index: 10000;
             transform: translate(-50%, -50%);
             transition: transform 0.05s linear;
-            box-shadow: 0 0 10px rgba(255,255,255,0.5);
+            box-shadow: 0 0 15px 2px currentColor;
+            border: 2px solid white;
         }
+
         .cursor-label {
             position: absolute;
-            top: -20px;
+            top: -25px;
             left: 50%;
             transform: translateX(-50%);
-            font-size: 10px;
-            font-weight: 800;
+            font-size: 11px;
+            font-weight: 900;
             white-space: nowrap;
             text-transform: uppercase;
-        }
-        .trail {
-            position: fixed;
-            width: 6px;
-            height: 6px;
-            border-radius: 50%;
-            pointer-events: none;
-            z-index: 9999;
-            animation: fadeOut 0.6s forwards;
-        }
-        @keyframes fadeOut {
-            to { opacity: 0; transform: scale(0.1) translateY(10px); }
+            letter-spacing: 1px;
+            background: rgba(0,0,0,0.6);
+            padding: 2px 8px;
+            border-radius: 4px;
+            color: white !important;
+            border: 1px solid rgba(255,255,255,0.2);
         }
 
         /* Animated Stars Background */
@@ -109,6 +112,7 @@
             transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1); 
             box-shadow: 0 0 40px rgba(59, 130, 246, 0.3);
             font-weight: bold;
+            pointer-events: auto;
         }
 
         button#click-btn:hover { background: #2563eb; transform: translateY(-2px); }
@@ -125,6 +129,7 @@
             justify-content: center; 
             z-index: 1000; 
             color: white; 
+            cursor: auto;
         }
         
         #name-overlay h1 { font-size: 4rem; color: #facc15; margin-bottom: 20px; text-shadow: 0 0 20px rgba(250, 204, 21, 0.3); }
@@ -205,16 +210,15 @@
 <body>
 
     <div class="stars-container" id="stars"></div>
-    <div id="cursor-container"></div> <!-- Container for remote users -->
+    <canvas id="trail-canvas"></canvas>
+    <div id="cursor-container"></div>
 
-    <!-- INITIAL SCREEN -->
     <div id="name-overlay">
         <h1>GLOBAL CLICKER</h1>
         <input type="text" id="name-input" placeholder="Your Name" maxlength="15">
         <button id="start-btn">ENTER GAME</button>
     </div>
 
-    <!-- MAIN GAME -->
     <div id="game-container">
         <div id="counter">0</div>
         <div id="last-clicked">Awaiting Data...</div>
@@ -272,14 +276,13 @@
     </div>
 
     <script>
-        // Star Background Generation
+        // Star Background
         const starsContainer = document.getElementById('stars');
         for (let i = 0; i < 150; i++) {
             const star = document.createElement('div');
             star.className = 'star';
             const size = (Math.random() * 2 + 1) + 'px';
-            star.style.width = size;
-            star.style.height = size;
+            star.style.width = size; star.style.height = size;
             star.style.left = Math.random() * 100 + '%';
             star.style.top = Math.random() * 100 + '%';
             star.style.setProperty('--duration', (Math.random() * 3 + 2) + 's');
@@ -287,12 +290,48 @@
             starsContainer.appendChild(star);
         }
 
-        window.onload = async function() {
-            if (!window.supabase) {
-                alert("Library Error: Check internet connection.");
-                return;
-            }
+        // NEW: High-End Particle Engine for Trails
+        const canvas = document.getElementById('trail-canvas');
+        const ctx = canvas.getContext('2d');
+        let particles = [];
+        
+        function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
+        window.onresize = resize; resize();
 
+        class Particle {
+            constructor(x, y, color) {
+                this.x = x; this.y = y; this.color = color;
+                this.size = Math.random() * 4 + 2;
+                this.speedX = Math.random() * 2 - 1;
+                this.speedY = Math.random() * 2 - 1;
+                this.life = 1.0;
+            }
+            update() {
+                this.x += this.speedX; this.y += this.speedY;
+                this.life -= 0.02; if(this.size > 0.1) this.size -= 0.05;
+            }
+            draw() {
+                ctx.fillStyle = this.color;
+                ctx.globalAlpha = this.life;
+                ctx.shadowBlur = 10; ctx.shadowColor = this.color;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        function animateParticles() {
+            ctx.clearRect(0,0, canvas.width, canvas.height);
+            for (let i = 0; i < particles.length; i++) {
+                particles[i].update(); particles[i].draw();
+                if (particles[i].life <= 0) { particles.splice(i, 1); i--; }
+            }
+            requestAnimationFrame(animateParticles);
+        }
+        animateParticles();
+
+        window.onload = async function() {
+            if (!window.supabase) return alert("Library Error.");
             const SUPABASE_URL = 'https://dhtqvsdojuoxzfewtxld.supabase.co';
             const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRodHF2c2RvanVveHpmZXd0eGxkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjgxNTkxMzQsImV4cCI6MjA4MzczNTEzNH0.MAcxrDMZQ20kQXv-nk3zvNGMQlP9-BR97UYT5p_W7Fg';
             const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
@@ -303,79 +342,67 @@
             const nameOverlay = document.getElementById('name-overlay');
             const nameInput = document.getElementById('name-input');
             const rateDisplay = document.getElementById('auto-rate-val');
-            
-            let userName = "";
-
-            // NEW: Cursor logic variables
             const cursors = {};
             const cursorContainer = document.getElementById('cursor-container');
+            let userName = "";
 
             function getCursorColor(name) {
                 const n = name.toLowerCase();
                 if (n === 'grace') return '#FFD700'; // Gold
-                if (n === 'derrick') return '#000080'; // Navy Blue
+                if (n === 'derrick') return '#4466FF'; // Navy Blue (Brightened for visibility)
                 return '#FFFFFF';
-            }
-
-            function createTrail(x, y, color) {
-                const trail = document.createElement('div');
-                trail.className = 'trail';
-                trail.style.left = x + 'px';
-                trail.style.top = y + 'px';
-                trail.style.backgroundColor = color;
-                trail.style.boxShadow = `0 0 8px ${color}`;
-                document.body.appendChild(trail);
-                setTimeout(() => trail.remove(), 600);
             }
 
             document.getElementById('start-btn').onclick = function() {
                 userName = nameInput.value.trim();
-                if(!userName) { alert("Enter a name!"); return; }
+                if(!userName) return alert("Enter a name!");
                 nameOverlay.style.display = "none";
                 gameContainer.style.display = "flex";
                 
-                // Track mouse and broadcast
                 document.addEventListener('mousemove', (e) => {
                     const color = getCursorColor(userName);
-                    if (userName.toLowerCase() === 'grace' || userName.toLowerCase() === 'derrick') {
-                        createTrail(e.clientX, e.clientY, color);
+                    particles.push(new Particle(e.clientX, e.clientY, color));
+                    
+                    // Local Cursor for Self
+                    if (!cursors['self']) {
+                        const el = document.createElement('div');
+                        el.className = 'remote-cursor';
+                        el.style.color = color;
+                        el.innerHTML = `<div class="cursor-label">${userName}</div>`;
+                        cursorContainer.appendChild(el);
+                        cursors['self'] = el;
                     }
+                    cursors['self'].style.left = e.clientX + 'px';
+                    cursors['self'].style.top = e.clientY + 'px';
+
                     supabase.channel('cursors').send({
-                        type: 'broadcast',
-                        event: 'move',
+                        type: 'broadcast', event: 'move', 
                         payload: { x: e.clientX, y: e.clientY, name: userName }
                     });
                 });
-
                 fetchCount();
             };
 
-            // NEW: Listen for mouse movement from others
             supabase.channel('cursors').on('broadcast', { event: 'move' }, ({ payload }) => {
                 if (payload.name === userName) return;
-
+                const color = getCursorColor(payload.name);
+                
                 if (!cursors[payload.name]) {
                     const el = document.createElement('div');
                     el.className = 'remote-cursor';
-                    el.style.backgroundColor = getCursorColor(payload.name);
+                    el.style.color = color;
                     el.innerHTML = `<div class="cursor-label">${payload.name}</div>`;
                     cursorContainer.appendChild(el);
                     cursors[payload.name] = el;
                 }
-
-                const cursorEl = cursors[payload.name];
-                cursorEl.style.left = payload.x + 'px';
-                cursorEl.style.top = payload.y + 'px';
-
-                // Trails for others
-                const pName = payload.name.toLowerCase();
-                if (pName === 'grace' || pName === 'derrick') {
-                    createTrail(payload.x, payload.y, getCursorColor(payload.name));
-                }
+                cursors[payload.name].style.left = payload.x + 'px';
+                cursors[payload.name].style.top = payload.y + 'px';
+                particles.push(new Particle(payload.x, payload.y, color));
             }).subscribe();
 
+            // Original Logic preserved below
             async function fetchCount() {
-                const { data, error } = await supabase.from('clicks').select('*').eq('id', 1).single();
+                const { data } = await supabase.from('clicks').select('*').eq('id', 1).single();
                 if (data) updateUI(data);
             }
 
@@ -384,12 +411,10 @@
                 nameDisplay.innerText = "Last Clicked By: " + (data.last_name || "None");
                 rateDisplay.innerText = (data.auto_rate || 0).toLocaleString();
                 document.getElementById('last-purchase').innerText = "Last Purchase: " + (data.last_purchase_name || "None");
-                
                 for(let i=1; i<=10; i++) {
                     const el = document.getElementById(`u${i}-last`);
                     if(el) el.innerText = "Last Buyer: " + (data[`last_u${i}_name`] || "None");
                 }
-                
                 const costs = [50, 400, 3000, 15000, 80000, 400000, 1500000, 8000000, 50000000, 250000000];
                 document.querySelectorAll('.buy-btn').forEach((btn, idx) => {
                     btn.disabled = data.count < costs[idx];
@@ -399,29 +424,24 @@
             window.buyUpgrade = async function(rateAdd, cost, column) {
                 const currentCount = parseFloat(counterDisplay.innerText.replace(/,/g, ''));
                 if(currentCount < cost) return;
-
-                const { error } = await supabase.from('clicks').update({
+                await supabase.from('clicks').update({
                     count: currentCount - cost,
                     auto_rate: parseFloat(rateDisplay.innerText.replace(/,/g, '')) + rateAdd,
                     last_purchase_name: userName,
                     [`last_${column}_name`]: userName
                 }).eq('id', 1);
-                if(error) alert("Purchase Error: " + error.message);
             }
 
             document.getElementById('click-btn').addEventListener('click', async () => {
                 const current = parseFloat(counterDisplay.innerText.replace(/,/g, '')) || 0;
                 counterDisplay.innerText = (current + 1).toLocaleString();
                 nameDisplay.innerText = "Last Clicked By: " + userName;
-
                 await supabase.from('clicks').update({ count: current + 1, last_name: userName }).eq('id', 1);
             });
 
             setInterval(async () => {
                 const rate = parseFloat(rateDisplay.innerText.replace(/,/g, '')) || 0;
-                if(rate > 0) {
-                    await supabase.rpc('increment_auto_clicks', { amount: rate });
-                }
+                if(rate > 0) await supabase.rpc('increment_auto_clicks', { amount: rate });
             }, 1000);
 
             supabase.channel('any').on('postgres_changes', { event: '*', schema: 'public', table: 'clicks' }, payload => {
