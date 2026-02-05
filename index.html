@@ -6,27 +6,83 @@
     <!-- 1. Try a different CDN for the Supabase library -->
     <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
     <style>
-        body { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; font-family: sans-serif; background: #f0f2f5; }
+        /* EXISTING STYLES */
+        body { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; font-family: sans-serif; background: #f0f2f5; margin: 0; padding: 20px; }
         #counter { font-size: 5rem; margin-bottom: 5px; color: #1e293b; }
         #last-clicked { font-size: 1.2rem; margin-bottom: 20px; color: #64748b; font-weight: bold; }
-        button { padding: 15px 40px; font-size: 1.5rem; cursor: pointer; background: #3b82f6; color: white; border: none; border-radius: 8px; }
+        button { padding: 15px 40px; font-size: 1.5rem; cursor: pointer; background: #3b82f6; color: white; border: none; border-radius: 8px; transition: transform 0.1s; }
+        button:active { transform: scale(0.95); }
+
+        /* NEW STYLES: Initial Name Screen */
+        #name-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #1e293b; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 100; color: white; }
+        #name-overlay input { padding: 15px; font-size: 1.5rem; border-radius: 8px; border: none; margin-bottom: 20px; width: 300px; text-align: center; }
+        #name-overlay button { background: #10b981; }
+
+        /* NEW STYLES: Shop */
+        #game-container { display: none; flex-direction: column; align-items: center; width: 100%; max-width: 600px; }
+        .shop { margin-top: 40px; width: 100%; background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
+        .shop h2 { margin-top: 0; color: #1e293b; border-bottom: 2px solid #f1f5f9; padding-bottom: 10px; }
+        .upgrade-card { display: flex; justify-content: space-between; align-items: center; padding: 15px; border-bottom: 1px solid #f1f5f9; }
+        .upgrade-info { display: flex; flex-direction: column; }
+        .upgrade-info b { font-size: 1.1rem; }
+        .upgrade-info span { font-size: 0.85rem; color: #64748b; }
+        .buy-btn { padding: 8px 16px; font-size: 1rem; background: #10b981; }
+        .buy-btn:disabled { background: #94a3b8; cursor: not-allowed; }
+        #global-stats { margin-top: 10px; font-size: 0.9rem; color: #475569; }
     </style>
 </head>
 <body>
 
-    <div id="counter">loading...</div>
-    <div id="last-clicked">Waiting for data...</div>
-    <button id="click-btn">CLICK ME</button>
+    <!-- NEW: Initial Screen -->
+    <div id="name-overlay">
+        <h1>Global Clicker</h1>
+        <p>Enter your name to join the world:</p>
+        <input type="text" id="name-input" placeholder="Your Name..." maxlength="15">
+        <button id="start-btn">ENTER GAME</button>
+    </div>
+
+    <!-- MAIN GAME (Initially Hidden) -->
+    <div id="game-container">
+        <div id="counter">loading...</div>
+        <div id="last-clicked">Waiting for data...</div>
+        <button id="click-btn">CLICK ME</button>
+        
+        <div id="global-stats">Auto-Click Rate: <span id="auto-rate-val">0</span> CPS</div>
+
+        <!-- NEW: Shop Section -->
+        <div class="shop">
+            <h2>Upgrades Shop</h2>
+            <div id="last-purchase" style="font-size: 0.9rem; color: #ef4444; margin-bottom: 10px;">Last Purchase: None</div>
+            
+            <div class="upgrade-card">
+                <div class="upgrade-info">
+                    <b>Micro-Bot (1 per 10s)</b>
+                    <span id="u1-last">Last Buyer: None</span>
+                </div>
+                <button class="buy-btn" onclick="buyUpgrade(0.1, 50, 'u1')">Buy: 50</button>
+            </div>
+
+            <div class="upgrade-card">
+                <div class="upgrade-info">
+                    <b>Click Farm (1 per sec)</b>
+                    <span id="u2-last">Last Buyer: None</span>
+                </div>
+                <button class="buy-btn" onclick="buyUpgrade(1, 400, 'u2')">Buy: 400</button>
+            </div>
+
+            <div class="upgrade-card">
+                <div class="upgrade-info">
+                    <b>Click Factory (10 per sec)</b>
+                    <span id="u3-last">Last Buyer: None</span>
+                </div>
+                <button class="buy-btn" onclick="buyUpgrade(10, 3000, 'u3')">Buy: 3000</button>
+            </div>
+        </div>
+    </div>
 
     <script>
         // Use a timeout to ensure everything is loaded
         window.onload = async function() {
-            // NEW: Prompt for name before starting
-            let userName = prompt("Enter your name to start clicking:") || "Anonymous";
-
-            const counterDisplay = document.getElementById('counter');
-            const nameDisplay = document.getElementById('last-clicked');
-            
             // STEP 1: Check if Supabase library exists
             if (!window.supabase) {
                 alert("CRITICAL ERROR: Supabase library failed to load! Check your internet or disable AdBlock.");
@@ -34,7 +90,7 @@
             }
 
             const SUPABASE_URL = 'https://dhtqvsdojuoxzfewtxld.supabase.co';
-            const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRodHF2c2RvanVveHpmZXd0eGxkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjgxNTkxMzQsImV4cCI6MjA4MzczNTEzNH0.MAcxrDMZQ20kQXv-nk3zvNGMQlP9-BR97UYT5p_W7Fg';
+            const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRodHF2c2RovanVveHpmZXd0eGxkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjgxNTkxMzQsImV4cCI6MjA4MzczNTEzNH0.MAcxrDMZQ20kQXv-nk3zvNGMQlP9-BR97UYT5p_W7Fg';
             
             let supabase;
             try {
@@ -43,14 +99,29 @@
                 alert("Client Init Error: " + e.message);
             }
 
+            const counterDisplay = document.getElementById('counter');
+            const nameDisplay = document.getElementById('last-clicked');
+            const gameContainer = document.getElementById('game-container');
+            const nameOverlay = document.getElementById('name-overlay');
+            const nameInput = document.getElementById('name-input');
+            
+            // NEW: Name initialization
+            let userName = "";
+            document.getElementById('start-btn').onclick = function() {
+                userName = nameInput.value.trim();
+                if(!userName) { alert("Please enter a name!"); return; }
+                nameOverlay.style.display = "none";
+                gameContainer.style.display = "flex";
+                fetchCount();
+            };
+
             // STEP 2: Attempt to fetch data with a timeout
             async function fetchCount() {
                 console.log("Attempting fetch...");
                 try {
-                    // UPDATED: Now selecting last_name as well
                     const { data, error } = await supabase
                         .from('clicks')
-                        .select('count, last_name')
+                        .select('*') // Updated to select all columns
                         .eq('id', 1)
                         .single();
 
@@ -58,9 +129,7 @@
                         alert("Database Query Error: " + error.message + "\nCode: " + error.code);
                         counterDisplay.innerText = "DB Error";
                     } else if (data) {
-                        counterDisplay.innerText = data.count;
-                        // NEW: Update name display
-                        nameDisplay.innerText = "Last Clicked By: " + (data.last_name || "None");
+                        updateUI(data);
                     } else {
                         alert("Fetch successful, but NO DATA found. Did you insert the row with ID 1?");
                         counterDisplay.innerText = "No Row";
@@ -70,15 +139,55 @@
                 }
             }
 
+            // NEW: Unified UI Update function
+            function updateUI(data) {
+                counterDisplay.innerText = Math.floor(data.count);
+                nameDisplay.innerText = "Last Clicked By: " + (data.last_name || "None");
+                document.getElementById('auto-rate-val').innerText = data.auto_rate || 0;
+                document.getElementById('last-purchase').innerText = "Last Purchase: " + (data.last_purchase_name || "None");
+                document.getElementById('u1-last').innerText = "Last Buyer: " + (data.last_u1_name || "None");
+                document.getElementById('u2-last').innerText = "Last Buyer: " + (data.last_u2_name || "None");
+                document.getElementById('u3-last').innerText = "Last Buyer: " + (data.last_u3_name || "None");
+                
+                // Disable/Enable buttons based on cost
+                const buttons = document.querySelectorAll('.buy-btn');
+                const costs = [50, 400, 3000];
+                buttons.forEach((btn, idx) => {
+                    btn.disabled = data.count < costs[idx];
+                });
+            }
+
+            // NEW: Global Shop Logic
+            window.buyUpgrade = async function(rateAdd, cost, column) {
+                const currentCount = parseInt(counterDisplay.innerText);
+                if(currentCount < cost) return;
+
+                const { data, error } = await supabase.rpc('buy_upgrade_secure', {
+                    row_id: 1,
+                    cost_val: cost,
+                    rate_add: rateAdd,
+                    buyer_name: userName,
+                    col_name: column
+                });
+
+                // Fallback if RPC is not set up: standard update
+                if (error) {
+                    const { error: upError } = await supabase.from('clicks').update({
+                        count: currentCount - cost,
+                        auto_rate: parseFloat(document.getElementById('auto-rate-val').innerText) + rateAdd,
+                        last_purchase_name: userName,
+                        [`last_${column}_name`]: userName
+                    }).eq('id', 1);
+                    if(upError) alert("Purchase Error: " + upError.message);
+                }
+            }
+
             // STEP 3: Handle Clicks
             document.getElementById('click-btn').addEventListener('click', async () => {
                 const current = parseInt(counterDisplay.innerText) || 0;
-                
-                // Optimistic UI updates
                 counterDisplay.innerText = current + 1; 
                 nameDisplay.innerText = "Last Clicked By: " + userName;
 
-                // UPDATED: Now updating last_name in the database
                 const { error } = await supabase
                     .from('clicks')
                     .update({ 
@@ -90,19 +199,25 @@
                 if (error) alert("Update Failed: " + error.message);
             });
 
+            // NEW: Auto-clicker process (every 1 second)
+            setInterval(async () => {
+                const rate = parseFloat(document.getElementById('auto-rate-val').innerText) || 0;
+                if(rate > 0) {
+                    // Only one "leader" should ideally update the world, 
+                    // but for a simple global clicker, we increment locally and sync.
+                    const { data } = await supabase.rpc('increment_auto_clicks', { amount: rate });
+                    // If no RPC, we just let the DB handle it via a manual update periodically
+                }
+            }, 1000);
+
             // STEP 4: Realtime
             supabase.channel('any')
                 .on('postgres_changes', { event: '*', schema: 'public', table: 'clicks' }, payload => {
-                    if (payload.new && payload.new.count !== undefined) {
-                        counterDisplay.innerText = payload.new.count;
-                        // NEW: Update name in realtime
-                        nameDisplay.innerText = "Last Clicked By: " + (payload.new.last_name || "Anonymous");
+                    if (payload.new) {
+                        updateUI(payload.new);
                     }
                 })
                 .subscribe();
-
-            // Run the initial fetch
-            fetchCount();
         };
     </script>
 </body>
