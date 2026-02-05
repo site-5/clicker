@@ -1,87 +1,49 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Multiplayer Clicker</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    <meta charset="UTF-8">
+    <title>Global Clicker</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        body { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; font-family: sans-serif; background: #f0f2f5; }
+        #counter { font-size: 5rem; margin-bottom: 20px; color: #1e293b; }
+        button { padding: 15px 40px; font-size: 1.5rem; cursor: pointer; background: #3b82f6; color: white; border: none; border-radius: 8px; transition: transform 0.1s; }
+        button:active { transform: scale(0.95); }
+    </style>
 </head>
-<body class="bg-zinc-900 text-white flex items-center justify-center min-h-screen">
-
-    <!-- Screen 1: Pick Name -->
-    <div id="login" class="text-center">
-        <h1 class="text-3xl font-bold mb-8 italic">Who are you?</h1>
-        <div class="flex gap-4">
-            <button onclick="start('Derrick')" class="bg-blue-600 p-6 rounded-xl text-xl font-bold hover:bg-blue-500">Derrick</button>
-            <button onclick="start('Grace')" class="bg-rose-600 p-6 rounded-xl text-xl font-bold hover:bg-rose-500">Grace</button>
-        </div>
-    </div>
-
-    <!-- Screen 2: Game -->
-    <div id="game" class="hidden text-center">
-        <div id="error-box" class="text-red-500 mb-4 font-bold"></div>
-        <h1 id="score" class="text-9xl font-black mb-8 text-white">0</h1>
-        <button onclick="hit()" class="bg-white text-black w-48 h-48 rounded-full text-4xl font-black active:scale-90 transition-transform">CLICK</button>
-        <p class="mt-10 text-gray-500 uppercase text-xs font-bold tracking-widest">Last Clicker</p>
-        <p id="last-person" class="text-2xl font-bold">Connecting...</p>
-    </div>
+<body>
+    <div id="counter">loading...</div>
+    <button id="click-btn">CLICK ME</button>
 
     <script>
-        // --- PUT YOUR OWN STUFF HERE ---
-        const URL = 'https://dhtqvsdojuoxzfewtxld.supabase.coL';
-        const KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRodHF2c2RvanVveHpmZXd0eGxkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjgxNTkxMzQsImV4cCI6MjA4MzczNTEzNH0.MAcxrDMZQ20kQXv-nk3zvNGMQlP9-BR97UYT5p_W7Fg';
-        // -------------------------------
+        const SUPABASE_URL = 'https://dhtqvsdojuoxzfewtxld.supabase.co';
+        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRodHF2c2RvanVveHpmZXd0eGxkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjgxNTkxMzQsImV4cCI6MjA4MzczNTEzNH0.MAcxrDMZQ20kQXv-nk3zvNGMQlP9-BR97UYT5p_W7Fg';
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-        const supabase = window.supabase.createClient(URL, KEY);
-        let myName = "";
-        let currentCount = 0;
+        const counterDisplay = document.getElementById('counter');
+        const clickBtn = document.getElementById('click-btn');
 
-        async function start(name) {
-            myName = name;
-            // Hide login, show game
-            document.getElementById('login').classList.add('hidden');
-            document.getElementById('game').classList.remove('hidden');
-            
-            await loadData();
-            subscribe();
+        async function fetchCount() {
+            const { data } = await supabase.from('clicks').select('count').eq('id', 1).single();
+            if (data) counterDisplay.innerText = data.count;
         }
 
-        async function loadData() {
-            const { data, error } = await supabase.from('clicker').select('*').eq('id', 1).single();
-            if (error) {
-                document.getElementById('error-box').innerText = "DB Error: Table not found or RLS is ON";
-                console.error(error);
-            } else {
-                updateUI(data);
-            }
+        async function incrementCount() {
+            // Using a simple update for demonstration. 
+            // In production, an RPC (Database Function) is better to handle concurrency.
+            const current = parseInt(counterDisplay.innerText);
+            await supabase.from('clicks').update({ count: current + 1 }).eq('id', 1);
         }
 
-        function subscribe() {
-            supabase.channel('room1')
-                .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'clicker' }, payload => {
-                    updateUI(payload.new);
-                })
-                .subscribe();
-        }
+        // Subscribe to real-time changes
+        supabase.channel('clicks-channel')
+            .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'clicks' }, payload => {
+                counterDisplay.innerText = payload.new.count;
+            })
+            .subscribe();
 
-        async function hit() {
-            // Predict for speed
-            currentCount++;
-            document.getElementById('score').innerText = currentCount;
-            document.getElementById('last-person').innerText = myName;
-
-            // Save to DB
-            const { error } = await supabase.from('clicker')
-                .update({ count: currentCount, who: myName })
-                .eq('id', 1);
-            
-            if (error) console.error("Update failed", error);
-        }
-
-        function updateUI(data) {
-            currentCount = data.count;
-            document.getElementById('score').innerText = data.count;
-            document.getElementById('last-person').innerText = data.who;
-        }
+        clickBtn.addEventListener('click', incrementCount);
+        fetchCount();
     </script>
 </body>
 </html>
