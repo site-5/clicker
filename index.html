@@ -2,47 +2,90 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Global Clicker</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
-        body { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; font-family: sans-serif; background: #f0f2f5; }
-        #counter { font-size: 5rem; margin-bottom: 20px; color: #1e293b; }
-        button { padding: 15px 40px; font-size: 1.5rem; cursor: pointer; background: #3b82f6; color: white; border: none; border-radius: 8px; transition: transform 0.1s; }
+        body { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; font-family: sans-serif; background: #f0f2f5; margin: 0; }
+        #counter { font-size: 5rem; margin-bottom: 20px; color: #1e293b; font-weight: bold; }
+        button { padding: 15px 40px; font-size: 1.5rem; cursor: pointer; background: #3b82f6; color: white; border: none; border-radius: 8px; transition: transform 0.1s, background 0.3s; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); }
+        button:hover { background: #2563eb; }
         button:active { transform: scale(0.95); }
+        button:disabled { background: #94a3b8; cursor: not-allowed; }
     </style>
 </head>
 <body>
+
     <div id="counter">loading...</div>
     <button id="click-btn">CLICK ME</button>
 
     <script>
         const SUPABASE_URL = 'https://dhtqvsdojuoxzfewtxld.supabase.co';
         const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRodHF2c2RvanVveHpmZXd0eGxkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjgxNTkxMzQsImV4cCI6MjA4MzczNTEzNH0.MAcxrDMZQ20kQXv-nk3zvNGMQlP9-BR97UYT5p_W7Fg';
+        
         const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-
         const counterDisplay = document.getElementById('counter');
         const clickBtn = document.getElementById('click-btn');
 
+        // Fetch initial count
         async function fetchCount() {
-            const { data } = await supabase.from('clicks').select('count').eq('id', 1).single();
-            if (data) counterDisplay.innerText = data.count;
+            const { data, error } = await supabase
+                .from('clicks')
+                .select('count')
+                .eq('id', 1)
+                .single();
+
+            if (error) {
+                alert("Error fetching count: " + error.message);
+                counterDisplay.innerText = "Error";
+                return;
+            }
+
+            if (data) {
+                counterDisplay.innerText = data.count;
+            } else {
+                alert("No row found with ID 1. Please run the SQL insert.");
+                counterDisplay.innerText = "0";
+            }
         }
 
+        // Increment count
         async function incrementCount() {
-            // Using a simple update for demonstration. 
-            // In production, an RPC (Database Function) is better to handle concurrency.
-            const current = parseInt(counterDisplay.innerText);
-            await supabase.from('clicks').update({ count: current + 1 }).eq('id', 1);
+            const currentVal = parseInt(counterDisplay.innerText) || 0;
+            const newVal = currentVal + 1;
+
+            // Optimistic update (show number immediately)
+            counterDisplay.innerText = newVal;
+
+            const { error } = await supabase
+                .from('clicks')
+                .update({ count: newVal })
+                .eq('id', 1);
+
+            if (error) {
+                alert("Error updating count: " + error.message);
+                // Revert UI on error
+                fetchCount();
+            }
         }
 
-        // Subscribe to real-time changes
-        supabase.channel('clicks-channel')
-            .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'clicks' }, payload => {
-                counterDisplay.innerText = payload.new.count;
-            })
-            .subscribe();
+        // Subscribe to real-time updates
+        const channel = supabase.channel('clicks-realtime')
+            .on('postgres_changes', 
+                { event: 'UPDATE', schema: 'public', table: 'clicks', filter: 'id=eq.1' }, 
+                (payload) => {
+                    counterDisplay.innerText = payload.new.count;
+                }
+            )
+            .subscribe((status) => {
+                if (status === 'CHANNEL_ERROR') {
+                    alert("Real-time connection failed. Changes may not sync instantly.");
+                }
+            });
 
         clickBtn.addEventListener('click', incrementCount);
+
+        // Run fetch on load
         fetchCount();
     </script>
 </body>
